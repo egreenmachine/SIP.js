@@ -11,6 +11,9 @@
 // Default MediaStreamManager provides single-use streams created with getUserMedia
 var MediaStreamManager = function MediaStreamManager (defaultConstraints) {
   var events = [
+    'userMediaRequest',
+    'userMedia',
+    'userMediaFailed'
   ];
   this.setConstraints(defaultConstraints);
 
@@ -19,7 +22,32 @@ var MediaStreamManager = function MediaStreamManager (defaultConstraints) {
 MediaStreamManager.prototype = Object.create(SIP.EventEmitter.prototype, {
   'acquire': {value: function acquire (onSuccess, onFailure, constraints) {
     constraints = constraints || this.constraints;
-    SIP.WebRTC.getUserMedia(constraints, onSuccess, onFailure);
+
+    this.emit('userMediaRequest', constraints);
+
+    var successWrapper = function () {
+      // Emit with all of the arguments from the real callback.
+      var newArgs = ['userMedia'].concat(
+        Array.prototype.slice.call(arguments)
+      );
+
+      this.emit.apply(this, newArgs);
+
+      onSuccess.apply(null, arguments);
+    }.bind(this);
+
+    var failureWrapper = function () {
+      // Emit with all of the arguments from the real callback.
+      var newArgs = ['userMediaFailed'].concat(
+        Array.prototype.slice.call(arguments)
+      );
+
+      this.emit.apply(this, newArgs);
+
+      onFailure.apply(null, arguments);
+    }.bind(this);
+
+    SIP.WebRTC.getUserMedia(constraints, successWrapper, failureWrapper);
   }},
 
   'release': {value: function release (stream) {

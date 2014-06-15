@@ -6,15 +6,87 @@ describe('MediaStreamManager', function() {
     mediaStreamManager = new MediaStreamManager();
   });
 
+  it('initializes its events', function () {
+    expect(mediaStreamManager.checkEvent('userMediaRequest')).toEqual(true);
+    expect(mediaStreamManager.checkEvent('userMedia')).toEqual(true);
+    expect(mediaStreamManager.checkEvent('userMediaFailed')).toEqual(true);
+  });
+
   describe('.acquire', function () {
-    it('passes its arguments to SIP.WebRTC.getUserMedia', function () {
+    it('passes its constraints to SIP.WebRTC.getUserMedia', function () {
       spyOn(SIP.WebRTC, 'getUserMedia');
       var onSuccess = function yay () {};
       var onFailure = function boo () {};
       var constraints = {audio: false, video: true};
       mediaStreamManager.acquire(onSuccess, onFailure, constraints);
-      expect(SIP.WebRTC.getUserMedia).toHaveBeenCalledWith(constraints, onSuccess, onFailure);
+      expect(SIP.WebRTC.getUserMedia.mostRecentCall.args[0]).toEqual(constraints);
     });
+
+    it('emits userMediaRequest before calling getUserMedia', function () {
+      spyOn(SIP.WebRTC, 'getUserMedia');
+      var flag = false;
+      mediaStreamManager.on('userMediaRequest', function () {
+        flag = true;
+        expect(SIP.WebRTC.getUserMedia).not.toHaveBeenCalled();
+      });
+
+      mediaStreamManager.acquire(new Function(), new Function(), {
+        audio: true,
+        video: true
+      });
+
+      expect(flag).toEqual(true);
+      expect(SIP.WebRTC.getUserMedia).toHaveBeenCalled();
+    });
+
+    it('emits userMedia when getUserMedia calls a success callback', function () {
+      var myStream = { foo: 'bar' };
+      spyOn(SIP.WebRTC, 'getUserMedia').andCallFake(function (c, s, f) {
+        s(myStream);
+      });
+
+      var success = jasmine.createSpy('success');
+      var failure = jasmine.createSpy('failure');
+      var flag = false;
+
+      mediaStreamManager.on('userMedia', function (stream) {
+        flag = true;
+        expect(stream).toEqual(myStream);
+      });
+
+      mediaStreamManager.acquire(success, failure, {
+        audio: true,
+        video: true
+      });
+
+      expect(flag).toEqual(true);
+      expect(success).toHaveBeenCalled();
+      expect(failure).not.toHaveBeenCalled();
+    });
+
+    it('emits userMediaFailed when getUserMedia calls a failure callback', function () {
+      spyOn(SIP.WebRTC, 'getUserMedia').andCallFake(function (c, s, f) {
+        f();
+      });
+
+      var success = jasmine.createSpy('success');
+      var failure = jasmine.createSpy('failure');
+      var flag = false;
+
+      mediaStreamManager.on('userMediaFailed', function () {
+        flag = true;
+      });
+
+      mediaStreamManager.acquire(success, failure, {
+        audio: true,
+        video: true
+      });
+
+      expect(flag).toEqual(true);
+      expect(success).not.toHaveBeenCalled();
+      expect(failure).toHaveBeenCalled();
+    });
+
   });
 
   describe('.release', function () {

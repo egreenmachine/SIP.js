@@ -16,6 +16,14 @@
 
 var MediaHandler = function(session, options) {
   var events = [
+    'userMediaRequest',
+    'userMedia',
+    'userMediaFailed',
+    'iceGathering',
+    'iceComplete',
+    'iceFailed',
+    'getDescription',
+    'setDescription'
   ];
   options = options || {};
 
@@ -73,15 +81,18 @@ var MediaHandler = function(session, options) {
     if (e.candidate) {
       self.logger.log('ICE candidate received: '+ e.candidate.candidate);
     } else if (self.onIceCompleted !== undefined) {
-      self.onIceCompleted();
+      self.onIceCompleted(this);
     }
   };
 
   this.peerConnection.onicegatheringstatechange = function () {
     self.logger.log('RTCIceGatheringState changed: ' + this.iceGatheringState);
+    if (this.iceGatheringState === 'gathering') {
+      self.emit('iceGathering', this);
+    }
     if (this.iceGatheringState === 'complete' &&
         self.onIceCompleted !== undefined) {
-      self.onIceCompleted();
+      self.onIceCompleted(this);
     }
   };
 
@@ -96,7 +107,7 @@ var MediaHandler = function(session, options) {
         reason_phrase: SIP.C.causes.RTP_TIMEOUT
       }); 
     } else if (e.currentTarget.iceGatheringState === 'complete' && this.iceConnectionState !== 'closed') {
-      self.onIceCompleted();
+      self.onIceCompleted(this);
     }*/
   };
 
@@ -105,6 +116,20 @@ var MediaHandler = function(session, options) {
   };
 
   this.initEvents(events);
+
+  function selfEmit(mh, event) {
+    if (mh.mediaStreamManager.on &&
+        mh.mediaStreamManager.checkEvent &&
+        mh.mediaStreamManager.checkEvent(event)) {
+      mh.mediaStreamManager.on(event, function () {
+        mh.emit.apply(mh, [event].concat(Array.prototype.slice.call(arguments)));
+      });
+    }
+  }
+
+  selfEmit(this, 'userMediaRequest');
+  selfEmit(this, 'userMedia');
+  selfEmit(this, 'userMediaFailed');
 };
 
 MediaHandler.defaultFactory = function defaultFactory (session, options) {
@@ -195,8 +220,14 @@ MediaHandler.prototype = Object.create(SIP.MediaHandler.prototype, {
   * @param {Function} onFailure
   */
   setDescription: {writable: true, value: function setDescription (sdp, onSuccess, onFailure) {
-    var type = this.hasOffer('local') ? 'answer' : 'offer';
-    var description = new SIP.WebRTC.RTCSessionDescription({type: type, sdp: sdp});
+    var rawDescription = {
+      type: this.hasOffer('local') ? 'answer' : 'offer',
+      sdp: sdp
+    };
+
+    this.emit('setDescription', rawDescription);
+
+    var description = new SIP.WebRTC.RTCSessionDescription(rawDescription);
     this.peerConnection.setRemoteDescription(description, onSuccess, onFailure);
   }},
 
@@ -337,11 +368,19 @@ MediaHandler.prototype = Object.create(SIP.MediaHandler.prototype, {
 
   createOfferOrAnswer: {writable: true, value: function createOfferOrAnswer (onSuccess, onFailure, constraints) {
     var self = this;
+    var methodName;
 
     function readySuccess () {
       var sdp = self.peerConnection.localDescription.sdp;
 
       sdp = SIP.Hacks.Chrome.needsExplicitlyInactiveSDP(sdp);
+
+      var sdpWrapper = {
+        type: methodName === 'createOffer' ? 'offer' : 'answer',
+        sdp: sdp
+      };
+
+      self.emit('getDescription', sdpWrapper);
 
       self.ready = true;
       onSuccess(sdp);
@@ -351,9 +390,10 @@ MediaHandler.prototype = Object.create(SIP.MediaHandler.prototype, {
       if (self.peerConnection.iceGatheringState === 'complete' && self.peerConnection.iceConnectionState === 'connected') {
         readySuccess();
       } else {
-        self.onIceCompleted = function() {
+        self.onIceCompleted = function(pc) {
           self.logger.log('ICE Gathering Completed');
           self.onIceCompleted = undefined;
+          self.emit('iceComplete', pc);
           readySuccess();
         };
       }
@@ -368,7 +408,7 @@ MediaHandler.prototype = Object.create(SIP.MediaHandler.prototype, {
 
     self.ready = false;
 
-    var methodName = self.hasOffer('remote') ? 'createAnswer' : 'createOffer';
+    methodName = self.hasOffer('remote') ? 'createAnswer' : 'createOffer';
 
     self.peerConnection[methodName](
       function(sessionDescription){

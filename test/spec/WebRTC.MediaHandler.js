@@ -33,6 +33,27 @@ describe('WebRTC.MediaHandler', function() {
     expect(MediaHandler.mediaStreamManager).toBe(mediaStreamManager);
   });
 
+  it('echoes MediaStreamManager events', function () {
+    var callbacks = {
+      umr: jasmine.createSpy('request'),
+      um: jasmine.createSpy('success'),
+      umf: jasmine.createSpy('failure')
+    };
+
+    MediaHandler.on('userMedia', callbacks.um);
+    MediaHandler.on('userMediaRequest', callbacks.umr);
+    MediaHandler.on('userMediaFailed', callbacks.umf);
+
+    MediaHandler.mediaStreamManager.emit('userMedia', 1, 2, 3);
+    expect(callbacks.um).toHaveBeenCalledWith(1, 2, 3);
+
+    MediaHandler.mediaStreamManager.emit('userMediaRequest', 4, 5, 6);
+    expect(callbacks.umr).toHaveBeenCalledWith(4, 5, 6);
+
+    MediaHandler.mediaStreamManager.emit('userMediaFailed', 7, 8, 9);
+    expect(callbacks.umf).toHaveBeenCalledWith(7, 8, 9);
+  });
+
   it('initializes mute state info', function() {
     expect(MediaHandler.audioMuted).toBe(false);
     expect(MediaHandler.videoMuted).toBe(false);
@@ -264,6 +285,26 @@ describe('WebRTC.MediaHandler', function() {
       expect(MediaHandler.getLocalStreams()[0].getVideoTracks()[0].enabled).toBe(true);
       MediaHandler.toggleMuteVideo(false);
       expect(MediaHandler.getLocalStreams()[0].getVideoTracks()[0].enabled).toBe(true);
+    });
+  });
+
+  describe('.setDescription', function () {
+    it('emits setDescription before creating RTCSessionDescription', function () {
+      spyOn(SIP.WebRTC, 'RTCSessionDescription');
+
+      var flag = false;
+      var mySDP = 'foo';
+
+      MediaHandler.on('setDescription', function (raw) {
+        flag = true;
+        expect(raw.sdp).toEqual(mySDP);
+        expect(SIP.WebRTC.RTCSessionDescription).not.toHaveBeenCalled();
+      });
+
+      MediaHandler.setDescription(mySDP, new Function(), new Function());
+
+      expect(flag).toBe(true);
+      expect(SIP.WebRTC.RTCSessionDescription).toHaveBeenCalled();
     });
   });
 });

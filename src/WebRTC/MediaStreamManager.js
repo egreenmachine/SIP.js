@@ -25,29 +25,20 @@ MediaStreamManager.prototype = Object.create(SIP.EventEmitter.prototype, {
 
     this.emit('userMediaRequest', constraints);
 
-    var successWrapper = function () {
+    var emitThenCall = function (eventName, callback) {
+      var callbackArgs = Array.prototype.slice.call(arguments, 2);
       // Emit with all of the arguments from the real callback.
-      var newArgs = ['userMedia'].concat(
-        Array.prototype.slice.call(arguments)
-      );
+      var newArgs = [eventName].concat(callbackArgs);
 
       this.emit.apply(this, newArgs);
 
-      onSuccess.apply(null, arguments);
+      callback.apply(null, callbackArgs);
     }.bind(this);
 
-    var failureWrapper = function () {
-      // Emit with all of the arguments from the real callback.
-      var newArgs = ['userMediaFailed'].concat(
-        Array.prototype.slice.call(arguments)
-      );
-
-      this.emit.apply(this, newArgs);
-
-      onFailure.apply(null, arguments);
-    }.bind(this);
-
-    SIP.WebRTC.getUserMedia(constraints, successWrapper, failureWrapper);
+    SIP.WebRTC.getUserMedia(constraints,
+      emitThenCall.bind(this, 'userMedia', onSuccess),
+      emitThenCall.bind(this, 'userMediaFailed', onFailure)
+    );
   }},
 
   'release': {value: function release (stream) {

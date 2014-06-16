@@ -24,18 +24,17 @@ describe('MediaStreamManager', function() {
 
     it('emits userMediaRequest before calling getUserMedia', function () {
       spyOn(SIP.WebRTC, 'getUserMedia');
-      var flag = false;
-      mediaStreamManager.on('userMediaRequest', function () {
-        flag = true;
+      var onUMR = jasmine.createSpy().andCallFake(function () {
         expect(SIP.WebRTC.getUserMedia).not.toHaveBeenCalled();
       });
+      mediaStreamManager.on('userMediaRequest', onUMR);
 
       mediaStreamManager.acquire(new Function(), new Function(), {
         audio: true,
         video: true
       });
 
-      expect(flag).toEqual(true);
+      expect(onUMR).toHaveBeenCalled();
       expect(SIP.WebRTC.getUserMedia).toHaveBeenCalled();
     });
 
@@ -47,19 +46,18 @@ describe('MediaStreamManager', function() {
 
       var success = jasmine.createSpy('success');
       var failure = jasmine.createSpy('failure');
-      var flag = false;
-
-      mediaStreamManager.on('userMedia', function (stream) {
-        flag = true;
+      var onUM = jasmine.createSpy().andCallFake(function () {
         expect(stream).toEqual(myStream);
       });
+
+      mediaStreamManager.on('userMedia', onUM);
 
       mediaStreamManager.acquire(success, failure, {
         audio: true,
         video: true
       });
 
-      expect(flag).toEqual(true);
+      expect(onUM).toHaveBeenCalled();
       expect(success).toHaveBeenCalled();
       expect(failure).not.toHaveBeenCalled();
     });
@@ -71,18 +69,16 @@ describe('MediaStreamManager', function() {
 
       var success = jasmine.createSpy('success');
       var failure = jasmine.createSpy('failure');
-      var flag = false;
+      var onUMF = jasmine.createSpy();
 
-      mediaStreamManager.on('userMediaFailed', function () {
-        flag = true;
-      });
+      mediaStreamManager.on('userMediaFailed', onUMF);
 
       mediaStreamManager.acquire(success, failure, {
         audio: true,
         video: true
       });
 
-      expect(flag).toEqual(true);
+      expect(onUMF).toHaveBeenCalled();
       expect(success).not.toHaveBeenCalled();
       expect(failure).toHaveBeenCalled();
     });

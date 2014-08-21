@@ -463,7 +463,7 @@ Session.prototype = {
       throw new SIP.Exceptions.InvalidStateError(this.status);
     }
 
-    this.mediaHandler.hold();
+/*     this.mediaHandler.hold(); */
 
     // Check if RTCSession is ready to send a reINVITE
     if (!this.isReadyToReinvite()) {
@@ -482,16 +482,15 @@ Session.prototype = {
     }
 
     this.onhold('local');
-
     this.sendReinvite({
       mangle: function(body){
 
         // Don't receive media
         // TODO - This will break for media streams with different directions.
         if (!(/a=(sendrecv|sendonly|recvonly|inactive)/).test(body)) {
-          body = body.replace(/(m=[^\r]*\r\n)/g, '$1a=sendonly\r\n');
+          body = body.replace(/(m=[^\r]*\r\n)/g, '$1a=inactive\r\n');
         } else {
-          body = body.replace(/a=sendrecv\r\n/g, 'a=sendonly\r\n');
+          body = body.replace(/a=sendrecv\r\n/g, 'a=inactive\r\n');
           body = body.replace(/a=recvonly\r\n/g, 'a=inactive\r\n');
         }
 
@@ -505,17 +504,20 @@ Session.prototype = {
    */
   unhold: function() {
 
+/*
     if (this.status !== C.STATUS_WAITING_FOR_ACK && this.status !== C.STATUS_CONFIRMED) {
       throw new SIP.Exceptions.InvalidStateError(this.status);
     }
+*/
 
-    this.mediaHandler.unhold();
+/*     this.mediaHandler.unhold(); */
+/*
 
     if (!this.isReadyToReinvite()) {
       /* If there is a pending 'hold' action, cancel it and don't queue this one
        * Else, if there isn't any 'unhold' action, add this one to the queue
        * Else, if there is already a 'unhold' action, skip
-       */
+
       if (this.pending_actions.isPending('hold')) {
         this.pending_actions.pop('hold');
       } else if (!this.pending_actions.isPending('unhold')) {
@@ -525,6 +527,7 @@ Session.prototype = {
     } else if (this.local_hold === false) {
       return;
     }
+*/
 
     this.onunhold('local');
 
@@ -664,8 +667,8 @@ Session.prototype = {
         if(this.status === C.STATUS_CONFIRMED) {
           this.logger.log('re-INVITE received');
           // Switch these two lines to try re-INVITEs:
-          //this.receiveReinvite(request);
-          request.reply(488, null, ['Warning: 399 sipjs "Cannot update media description"']);
+          this.receiveReinvite(request);
+/*           request.reply(488, null, ['Warning: 399 sipjs "Cannot update media description"']); */
         }
         break;
       case SIP.C.INFO:

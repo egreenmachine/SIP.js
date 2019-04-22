@@ -65,6 +65,7 @@
     "build-bundles": "npm run build-reg-bundle && npm run build-min-bundle",
     "build-lib": "tsc -p src",
     "build-test": "tsc -p test",
+    "build-demo": "webpack --progress --config demo/webpack.config.js",
     "copy-dist-files": "cp dist/sip.js dist/sip-$npm_package_version.js && cp dist/sip.min.js dist/sip-$npm_package_version.min.js",
     "build": "npm run generate-grammar && npm run build-lib && npm run build-reg-bundle && npm run build-min-bundle && npm run copy-dist-files",
     "browserTest": "npm run build-test && sleep 2 && open http://0.0.0.0:9876/debug.html & karma start --reporters kjhtml --no-single-run",
